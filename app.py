@@ -62,6 +62,8 @@ def api_analytics():
 
 if __name__ == "__main__":
     init_db()
+    import subprocess
+    subprocess.run(["python", "scrape.py", "all"])
     print("Starting Book Cover Swiper...")
     print("Visit http://localhost:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
