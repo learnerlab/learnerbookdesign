@@ -4,7 +4,11 @@ with designer credits. Requires Playwright (headless browser) because the
 site blocks raw HTTP requests.
 
 Install: pip install playwright && playwright install chromium
+
+On Render: The build.sh script handles Chromium installation.
+Chromium runs with --no-sandbox in containerized environments.
 """
+import os
 import time
 import sys
 
@@ -297,7 +301,19 @@ def scrape_ineedabookcover(max_pages_per_genre=10):
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            # --no-sandbox is required in containerized environments (Render,
+            # Docker) where Chrome can't create its sandbox namespace.
+            # --disable-gpu avoids GPU-related crashes on headless servers.
+            launch_args = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+
+            # Use PLAYWRIGHT_CHROMIUM_PATH if set, otherwise let Playwright find it
+            executable = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+
+            browser = p.chromium.launch(
+                headless=True,
+                args=launch_args,
+                executable_path=executable,
+            )
             context = browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -394,5 +410,11 @@ def scrape_ineedabookcover(max_pages_per_genre=10):
 
     except Exception as e:
         print(f"  [ERROR] Scraper failed: {e}")
+        # Common Render issue: Chromium binary not found
+        if "Executable doesn't exist" in str(e):
+            print("  [HINT] Chromium not installed. On Render, make sure "
+                  "build.sh runs: playwright install --with-deps chromium")
+            print(f"  [HINT] PLAYWRIGHT_BROWSERS_PATH = "
+                  f"{os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '(not set)')}")
 
     return total

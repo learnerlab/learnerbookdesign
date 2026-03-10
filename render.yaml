@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: book-cover-swiper
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright
