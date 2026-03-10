@@ -9,13 +9,26 @@ from database import add_cover
 BASE_URL = "https://openlibrary.org"
 COVERS_URL = "https://covers.openlibrary.org"
 
+# Minimum publish year for filtering — focus on modern books
+MIN_YEAR = 2015
+
+# Nonfiction-heavy subjects with design-forward covers
 CURATED_SUBJECTS = [
-    "design", "graphic_design", "art", "fiction", "science_fiction",
-    "fantasy", "mystery", "thriller", "romance", "horror",
-    "literary_fiction", "poetry", "philosophy", "history",
-    "architecture", "photography", "typography",
-    "best_sellers", "award_winners", "classic_literature",
-    "contemporary_fiction", "young_adult", "biography",
+    # Nonfiction core
+    "popular_science", "science", "neuroscience", "psychology",
+    "sociology", "economics", "politics", "climate_change",
+    "technology", "artificial_intelligence",
+    "memoir", "biography", "autobiography",
+    "history", "american_history", "world_history",
+    "philosophy", "essays", "journalism",
+    "health", "self_help", "business",
+    "nature", "environment",
+    "food", "travel",
+    # Design & visual culture
+    "design", "graphic_design", "architecture", "photography",
+    "typography", "art", "visual_arts",
+    # Modern fiction (smaller portion)
+    "contemporary_fiction", "literary_fiction",
 ]
 
 
@@ -24,9 +37,10 @@ def get_cover_url(olid, size="L"):
 
 
 def scrape_subject(subject, limit=50):
-    """Scrape covers from an Open Library subject."""
+    """Scrape covers from an Open Library subject, filtering for modern books (post-2015)."""
     added = 0
     offset = 0
+    skipped_old = 0
 
     while added < limit:
         url = f"{BASE_URL}/subjects/{subject}.json?limit=50&offset={offset}"
@@ -50,10 +64,18 @@ def scrape_subject(subject, limit=50):
             if not cover_id and not cover_edition_key:
                 continue
 
+            # Filter by year — skip books published before MIN_YEAR
+            first_publish_year = work.get("first_publish_year")
+            if first_publish_year and first_publish_year < MIN_YEAR:
+                skipped_old += 1
+                continue
+
             if cover_id:
                 image_url = f"{COVERS_URL}/b/id/{cover_id}-L.jpg"
             else:
                 image_url = get_cover_url(cover_edition_key)
+
+            year_str = str(first_publish_year) if first_publish_year else ""
 
             result = add_cover(
                 title=title,
@@ -62,6 +84,7 @@ def scrape_subject(subject, limit=50):
                 image_url=image_url,
                 source="Open Library",
                 source_url=f"{BASE_URL}{work.get('key', '')}",
+                year=year_str,
             )
             if result:
                 added += 1
@@ -69,6 +92,9 @@ def scrape_subject(subject, limit=50):
                 break
 
         offset += 50
+        # Stop if we're mostly hitting old books (diminishing returns)
+        if skipped_old > 150:
+            break
         time.sleep(0.5)
 
     return added
