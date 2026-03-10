@@ -11,26 +11,35 @@ print("  Focus: Modern books (2015+), nonfiction,")
 print("  design-forward publishers (Penguin, Norton, Knopf)")
 print("=" * 60)
 
-sources = sys.argv[1:] if len(sys.argv) > 1 else ["bestsellers", "openlibrary"]
+sources = sys.argv[1:] if len(sys.argv) > 1 else [
+    "bestsellers", "openlibrary", "ineedabookcover"
+]
 
 total = 0
 
 if "bestsellers" in sources or "all" in sources:
-    print("\n[1/3] Scraping modern bestsellers, award winners & design publishers...")
+    print("\n[1/4] Scraping modern bestsellers, award winners & design publishers...")
     from scrapers.bestsellers import scrape_bestsellers
     count = scrape_bestsellers()
     print(f"  -> Added {count} covers from modern bestsellers & publishers")
     total += count
 
 if "openlibrary" in sources or "all" in sources:
-    print("\n[2/3] Scraping Open Library (modern nonfiction subjects, 2015+)...")
+    print("\n[2/4] Scraping Open Library (modern nonfiction subjects, 2015+)...")
     from scrapers.open_library import scrape_all as scrape_ol
     count = scrape_ol(covers_per_subject=20)
     print(f"  -> Added {count} covers from Open Library")
     total += count
 
+if "ineedabookcover" in sources or "all" in sources:
+    print("\n[3/4] Scraping I Need a Book Cover (designer directory, ~3000 covers)...")
+    from scrapers.ineedabookcover import scrape_ineedabookcover
+    count = scrape_ineedabookcover()
+    print(f"  -> Added {count} covers from I Need a Book Cover")
+    total += count
+
 if "archive" in sources or "all" in sources:
-    print("\n[3/3] Scraping Book Cover Archive...")
+    print("\n[4/4] Scraping Book Cover Archive...")
     from scrapers.book_cover_archive import scrape_all as scrape_bca
     count = scrape_bca()
     print(f"  -> Added {count} covers from Book Cover Archive")
