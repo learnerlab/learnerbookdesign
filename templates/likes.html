@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Liked Covers - Book Cover Swiper{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Liked Covers</h1>
+    <p>Your curated collection of inspiring book cover designs</p>
+</div>
+<div class="likes-grid" id="likes-grid">
+    <div class="loading"><div class="spinner"></div> Loading...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("nav-likes").classList.add("active");
+
+(async function() {
+    const grid = document.getElementById("likes-grid");
+    try {
+        const resp = await fetch("/api/likes");
+        const likes = await resp.json();
+
+        if (likes.length === 0) {
+            grid.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;">
+                <h2>No likes yet</h2>
+                <p>Start swiping to build your collection!</p>
+                <a href="/" class="btn">Start Swiping</a>
+            </div>`;
+            return;
+        }
+
+        grid.innerHTML = likes.map(cover => {
+            const badge = cover.action === "superlike"
+                ? '<span class="superlike-badge">SUPER LIKE</span>'
+                : '';
+            const author = cover.author ? `<div class="detail">${esc(cover.author)}</div>` : '';
+            const designer = cover.designer ? `<div class="detail">Design: ${esc(cover.designer)}</div>` : '';
+            return `
+                <div class="like-card">
+                    <img src="${esc(cover.image_url)}" alt="${esc(cover.title)}"
+                         onerror="this.style.display='none'">
+                    <div class="info">
+                        <h4>${esc(cover.title)}</h4>
+                        ${author}
+                        ${designer}
+                        ${badge}
+                    </div>
+                </div>`;
+        }).join("");
+    } catch {
+        grid.innerHTML = '<p style="text-align:center;color:var(--text-muted)">Failed to load likes.</p>';
+    }
+})();
+
+function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+{% endblock %}

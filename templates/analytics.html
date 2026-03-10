@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Analytics - Book Cover Swiper{% endblock %}
+{% block content %}
+<div class="analytics-container">
+    <div class="page-header">
+        <h1>Design Analytics</h1>
+        <p>Patterns and trends from your cover preferences</p>
+    </div>
+
+    <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="number">-</div><div class="label">Loading...</div></div>
+    </div>
+
+    <div class="section" id="designers-section">
+        <h2>Top Designers</h2>
+        <div id="designers-list"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <div class="section" id="genres-section">
+        <h2>Preferred Genres</h2>
+        <div class="bar-chart" id="genres-chart"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <div class="section" id="recent-section">
+        <h2>Recent Likes</h2>
+        <div class="likes-grid" id="recent-grid" style="padding:0;"></div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("nav-analytics").classList.add("active");
+
+(async function() {
+    try {
+        const resp = await fetch("/api/analytics");
+        const data = await resp.json();
+
+        // Stats cards
+        document.getElementById("stats-row").innerHTML = `
+            <div class="stat-card"><div class="number">${data.total_swiped}</div><div class="label">Total Swiped</div></div>
+            <div class="stat-card"><div class="number">${data.total_likes}</div><div class="label">Likes</div></div>
+            <div class="stat-card"><div class="number">${data.total_dislikes}</div><div class="label">Dislikes</div></div>
+            <div class="stat-card"><div class="number">${data.like_rate}%</div><div class="label">Like Rate</div></div>
+            <div class="stat-card"><div class="number">${data.total_unswiped}</div><div class="label">Remaining</div></div>
+        `;
+
+        // Top designers
+        const designersList = document.getElementById("designers-list");
+        if (data.top_designers.length === 0) {
+            designersList.innerHTML = '<p style="color:var(--text-muted)">No designer data yet. Like some covers with designer credits to see trends!</p>';
+        } else {
+            designersList.innerHTML = data.top_designers.map(d => `
+                <div class="designer-row">
+                    <span class="name">${esc(d.designer)}</span>
+                    <span class="count">${d.like_count} like${d.like_count > 1 ? 's' : ''}</span>
+                </div>
+            `).join("");
+        }
+
+        // Genre chart
+        const genresChart = document.getElementById("genres-chart");
+        if (data.top_genres.length === 0) {
+            genresChart.innerHTML = '<p style="color:var(--text-muted)">No genre data yet.</p>';
+        } else {
+            const maxCount = data.top_genres[0].like_count;
+            genresChart.innerHTML = data.top_genres.map(g => {
+                const width = Math.max((g.like_count / maxCount) * 100, 5);
+                return `
+                    <div class="bar-row">
+                        <span class="bar-label">${esc(g.genre)}</span>
+                        <div class="bar" style="width:${width}%"></div>
+                        <span class="bar-value">${g.like_count}</span>
+                    </div>`;
+            }).join("");
+        }
+
+        // Recent likes
+        const recentGrid = document.getElementById("recent-grid");
+        if (data.recent_likes.length === 0) {
+            recentGrid.innerHTML = '<p style="color:var(--text-muted);padding:1rem;">Start swiping to see your likes here!</p>';
+        } else {
+            recentGrid.innerHTML = data.recent_likes.map(cover => `
+                <div class="like-card">
+                    <img src="${esc(cover.image_url)}" alt="${esc(cover.title)}" onerror="this.style.display='none'">
+                    <div class="info">
+                        <h4>${esc(cover.title)}</h4>
+                        ${cover.author ? `<div class="detail">${esc(cover.author)}</div>` : ''}
+                    </div>
+                </div>
+            `).join("");
+        }
+    } catch {
+        document.getElementById("stats-row").innerHTML = '<p style="color:var(--text-muted)">Failed to load analytics.</p>';
+    }
+})();
+
+function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+{% endblock %}

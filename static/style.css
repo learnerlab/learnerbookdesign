@@ -1,0 +1,495 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #0f0f13;
+    --card-bg: #1a1a24;
+    --text: #e8e8ed;
+    --text-muted: #8888a0;
+    --accent: #6c5ce7;
+    --like: #00b894;
+    --dislike: #e74c3c;
+    --superlike: #fdcb6e;
+    --border: #2a2a3a;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* --- Navigation --- */
+nav {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    padding: 1rem 2rem;
+    background: rgba(15, 15, 19, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+nav a:hover, nav a.active {
+    color: var(--text);
+    background: var(--card-bg);
+}
+
+/* --- Swipe Area --- */
+.swipe-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 70px);
+    padding: 2rem;
+    position: relative;
+}
+
+.card-stack {
+    position: relative;
+    width: 320px;
+    height: 520px;
+}
+
+.card {
+    position: absolute;
+    width: 320px;
+    height: 520px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--card-bg);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+    cursor: grab;
+    user-select: none;
+    transition: transform 0.1s ease-out;
+    will-change: transform;
+}
+
+.card:active {
+    cursor: grabbing;
+}
+
+.card.removing {
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+    pointer-events: none;
+}
+
+.card.removing.liked {
+    transform: translateX(150%) rotate(20deg) !important;
+    opacity: 0;
+}
+
+.card.removing.disliked {
+    transform: translateX(-150%) rotate(-20deg) !important;
+    opacity: 0;
+}
+
+.card.removing.superliked {
+    transform: translateY(-150%) scale(1.1) !important;
+    opacity: 0;
+}
+
+.card-image {
+    width: 100%;
+    height: 380px;
+    object-fit: contain;
+    background: #111;
+    padding: 10px;
+}
+
+.card-info {
+    padding: 1rem 1.2rem;
+}
+
+.card-info h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-info .author {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+}
+
+.card-info .genre {
+    display: inline-block;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.card-info .source {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    margin-top: 0.3rem;
+}
+
+/* Swipe overlay indicators */
+.swipe-indicator {
+    position: absolute;
+    top: 20px;
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    z-index: 10;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.swipe-indicator.like {
+    right: 20px;
+    border: 3px solid var(--like);
+    color: var(--like);
+    transform: rotate(15deg);
+}
+
+.swipe-indicator.dislike {
+    left: 20px;
+    border: 3px solid var(--dislike);
+    color: var(--dislike);
+    transform: rotate(-15deg);
+}
+
+/* --- Action Buttons --- */
+.actions {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.action-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    transform: scale(1.15);
+}
+
+.action-btn.dislike-btn:hover {
+    border-color: var(--dislike);
+    color: var(--dislike);
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
+}
+
+.action-btn.like-btn:hover {
+    border-color: var(--like);
+    color: var(--like);
+    box-shadow: 0 0 20px rgba(0, 184, 148, 0.3);
+}
+
+.action-btn.superlike-btn:hover {
+    border-color: var(--superlike);
+    color: var(--superlike);
+    box-shadow: 0 0 20px rgba(253, 203, 110, 0.3);
+}
+
+/* --- Counter --- */
+.counter {
+    text-align: center;
+    margin-top: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* --- Empty State --- */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+}
+
+/* --- Likes Page --- */
+.likes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.like-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    transition: transform 0.2s;
+}
+
+.like-card:hover {
+    transform: translateY(-4px);
+}
+
+.like-card img {
+    width: 100%;
+    height: 280px;
+    object-fit: contain;
+    background: #111;
+    padding: 8px;
+}
+
+.like-card .info {
+    padding: 0.8rem;
+}
+
+.like-card .info h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.like-card .info .detail {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.like-card .superlike-badge {
+    display: inline-block;
+    background: var(--superlike);
+    color: #333;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    margin-top: 0.3rem;
+}
+
+.page-header {
+    text-align: center;
+    padding: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.page-header p {
+    color: var(--text-muted);
+}
+
+/* --- Analytics Page --- */
+.analytics-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card .number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stat-card .label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+.section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.designer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.designer-row:last-child {
+    border-bottom: none;
+}
+
+.designer-row .name {
+    font-weight: 500;
+}
+
+.designer-row .count {
+    background: var(--accent);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.bar-chart .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.bar-chart .bar-label {
+    min-width: 120px;
+    font-size: 0.85rem;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bar-chart .bar {
+    height: 24px;
+    background: var(--accent);
+    border-radius: 4px;
+    min-width: 4px;
+    transition: width 0.5s ease;
+}
+
+.bar-chart .bar-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 30px;
+}
+
+/* --- Loading --- */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--text-muted);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Keyboard hints */
+.keyboard-hints {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.keyboard-hints kbd {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 600px) {
+    .card-stack { width: 280px; height: 460px; }
+    .card { width: 280px; height: 460px; }
+    .card-image { height: 320px; }
+    nav { gap: 0.5rem; padding: 0.8rem 1rem; }
+    nav a { font-size: 0.85rem; padding: 0.4rem 0.7rem; }
+    .likes-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; padding: 1rem; }
+}

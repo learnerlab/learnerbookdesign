@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Swipe - Book Cover Swiper{% endblock %}
+{% block content %}
+<div class="swipe-container">
+    <div class="card-stack" id="card-stack">
+        <div class="loading"><div class="spinner"></div> Loading covers...</div>
+    </div>
+
+    <div class="actions">
+        <button class="action-btn dislike-btn" id="btn-dislike" title="Dislike (← or A)">&#x2717;</button>
+        <button class="action-btn superlike-btn" id="btn-superlike" title="Super Like (↑ or W)">&#x2605;</button>
+        <button class="action-btn like-btn" id="btn-like" title="Like (→ or D)">&#x2764;</button>
+    </div>
+
+    <div class="counter" id="counter"></div>
+
+    <div class="keyboard-hints">
+        <span><kbd>&larr;</kbd> Dislike</span>
+        <span><kbd>&uarr;</kbd> Super Like</span>
+        <span><kbd>&rarr;</kbd> Like</span>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/swipe.js"></script>
+<script>document.getElementById("nav-swipe").classList.add("active");</script>
+{% endblock %}
