@@ -62,8 +62,17 @@ def api_analytics():
 
 if __name__ == "__main__":
     init_db()
+
+    # Run scraper in background so the app binds to the port immediately
+    # (Render will kill the process if it doesn't bind within ~60 seconds)
+    import threading
     import subprocess
-    subprocess.run(["python", "scrape.py"])
+
+    def run_scraper():
+        subprocess.run(["python", "scrape.py"])
+
+    threading.Thread(target=run_scraper, daemon=True).start()
+
     print("Starting Book Cover Swiper...")
-    print("Visit http://localhost:5000")
+    print("Scraper running in background — covers will appear as they're fetched.")
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -32,8 +32,8 @@
                 stack.innerHTML = `
                     <div class="empty-state">
                         <h2>No more covers!</h2>
-                        <p>You've swiped through all available covers.<br>Run the scraper to fetch more.</p>
-                        <code style="color:var(--text-muted);font-size:0.85rem;">python scrape.py all</code>
+                        <p>You've swiped through all available covers.<br>Covers are being scraped from ineedabookcover.com — check back soon!</p>
+                        <button onclick="location.reload()" style="margin-top:1rem;padding:0.6rem 1.5rem;border-radius:8px;border:none;background:var(--accent, #6c63ff);color:#fff;font-size:0.95rem;cursor:pointer;">Refresh</button>
                     </div>`;
             }
             return;
