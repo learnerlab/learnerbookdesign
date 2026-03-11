@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Run scraper to populate the database with book covers from ineedabookcover.com."""
+"""Populate the database with book covers.
+
+Priority:
+1. Load from seed file (pre-scraped from ineedabookcover.com locally)
+2. Fall back to Open Library API (no browser needed)
+"""
 from database import init_db, get_cover_count
-from scrapers.ineedabookcover import scrape_ineedabookcover
+from scrapers.seed_loader import load_seed_covers
+from scrapers.openlibrary import scrape_openlibrary
 
 init_db()
 
@@ -11,13 +17,18 @@ if existing > 0:
     raise SystemExit(0)
 
 print("=" * 60)
-print("  Book Cover Swiper - Scraper")
-print("  Source: ineedabookcover.com (~3,000 curated covers)")
+print("  Book Cover Swiper - Loading Covers")
 print("=" * 60)
 
-print("\nScraping I Need a Book Cover (designer directory)...")
-total = scrape_ineedabookcover()
+# Try seed data first (from ineedabookcover.com, scraped locally)
+print("\nChecking for seed data from ineedabookcover.com...")
+total = load_seed_covers()
+
+if total == 0:
+    # Fall back to Open Library API
+    print("\nNo seed data found. Fetching from Open Library API...")
+    total = scrape_openlibrary()
 
 print(f"\n{'=' * 60}")
-print(f"  Total covers added: {total}")
+print(f"  Total covers loaded: {total}")
 print(f"{'=' * 60}")
