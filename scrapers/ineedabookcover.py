@@ -9,19 +9,50 @@ On Render: The build.sh script handles Chromium installation.
 Chromium runs with --no-sandbox in containerized environments.
 """
 import os
+import subprocess
 import time
 import sys
 
-# Ensure Playwright can find browsers installed by build.sh on Render
+# Ensure Playwright can find browsers installed by build.sh on Render.
+# Also store browsers under the project dir so they persist across deploys.
+_RENDER_PW_PATH = "/opt/render/project/.playwright"
 if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
-    render_pw_path = "/opt/render/project/.playwright"
-    if os.path.isdir(render_pw_path):
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = render_pw_path
+    if os.path.isdir(_RENDER_PW_PATH):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _RENDER_PW_PATH
+    elif os.path.isdir("/opt/render"):
+        # We're on Render but browsers haven't been installed yet
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _RENDER_PW_PATH
 
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:
     sync_playwright = None
+
+
+def _ensure_chromium_installed():
+    """Install Chromium if it's missing. Needed when build.sh wasn't used."""
+    pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+    # Check if any chromium directory exists under the browsers path
+    if pw_path and os.path.isdir(pw_path):
+        entries = os.listdir(pw_path)
+        if any("chromium" in e for e in entries):
+            return True  # Already installed
+
+    print("  [INFO] Chromium not found — installing now (one-time)...")
+    try:
+        result = subprocess.run(
+            ["playwright", "install", "--with-deps", "chromium"],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode == 0:
+            print("  [INFO] Chromium installed successfully.")
+            return True
+        else:
+            print(f"  [ERROR] Chromium install failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"  [ERROR] Could not install Chromium: {e}")
+        return False
 
 from database import add_cover
 
@@ -301,6 +332,9 @@ def scrape_ineedabookcover(max_pages_per_genre=10):
     if sync_playwright is None:
         print("  [SKIP] Playwright not installed. "
               "Install with: pip install playwright && playwright install chromium")
+        return 0
+
+    if not _ensure_chromium_installed():
         return 0
 
     total = 0
