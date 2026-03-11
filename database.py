@@ -63,6 +63,11 @@ def init_db():
         """)
 
 
+def get_cover_count():
+    with get_db_context() as conn:
+        return conn.execute("SELECT COUNT(*) FROM covers").fetchone()[0]
+
+
 def add_cover(title, author=None, designer=None, genre=None,
               image_url="", source=None, source_url=None, year=None):
     with get_db_context() as conn:

@@ -324,72 +324,17 @@ def scrape_ineedabookcover(max_pages_per_genre=10):
             )
             page = context.new_page()
 
-            # First scrape the main gallery with all covers
-            print("  Scraping main gallery...")
-            try:
-                page.goto(f"{BASE_URL}/book-covers/", timeout=30000)
-                page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception as e:
-                print(f"  [ERROR] Could not load main page: {e}")
-                browser.close()
-                return 0
-
-            # Scroll to load all covers on the main page
-            _scroll_to_load_all(page, max_scrolls=80)
-            main_covers = _extract_covers_from_page(page)
-            print(f"  Found {len(main_covers)} covers on main gallery page")
-
-            # If main page had pagination, follow it
-            if len(main_covers) < 100:
-                main_covers = _scrape_paginated(
-                    page, f"{BASE_URL}/book-covers/",
-                    max_pages=max_pages_per_genre
-                )
-
-            # Store main gallery covers
             seen_images = set()
-            for cover in main_covers:
-                if cover["image_url"] in seen_images:
-                    continue
-                seen_images.add(cover["image_url"])
 
-                result = add_cover(
-                    title=cover["title"],
-                    author=cover["author"],
-                    designer=cover["designer"],
-                    genre=cover["genre"],
-                    image_url=cover["image_url"],
-                    source="I Need a Book Cover",
-                    source_url=cover["source_url"],
-                )
-                if result:
-                    total += 1
-
-            print(f"  -> Added {total} covers from main gallery")
-
-            # Then scrape genre-specific pages for any we missed
-            for genre_path in GENRE_PAGES:
-                if genre_path == "/book-covers/":
-                    continue  # Already scraped main page
-
-                genre_name = genre_path.split("=")[-1] if "=" in genre_path else "all"
-                print(f"  Scraping genre: {genre_name}...")
-
-                genre_url = BASE_URL + genre_path
-                covers = _scrape_paginated(
-                    page, genre_url,
-                    max_pages=max_pages_per_genre
-                )
-
-                genre_added = 0
+            def _store_covers(covers, genre_override=None):
+                """Save a batch of covers to DB immediately. Returns count added."""
+                nonlocal total
+                added = 0
                 for cover in covers:
                     if cover["image_url"] in seen_images:
                         continue
                     seen_images.add(cover["image_url"])
-
-                    # Use the genre from URL if not found in page
-                    genre = cover["genre"] or genre_name.replace("-", " ").title()
-
+                    genre = cover["genre"] or genre_override or ""
                     result = add_cover(
                         title=cover["title"],
                         author=cover["author"],
@@ -400,11 +345,42 @@ def scrape_ineedabookcover(max_pages_per_genre=10):
                         source_url=cover["source_url"],
                     )
                     if result:
-                        genre_added += 1
+                        added += 1
                         total += 1
+                return added
 
-                print(f"    -> Added {genre_added} new covers from {genre_name}")
-                time.sleep(2)
+            # Scrape all genre pages (including main gallery)
+            for genre_path in GENRE_PAGES:
+                genre_name = genre_path.split("=")[-1] if "=" in genre_path else "all"
+                print(f"  Scraping {genre_name}...")
+
+                genre_url = BASE_URL + genre_path
+                try:
+                    page.goto(genre_url, timeout=30000)
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception as e:
+                    print(f"    [ERROR] Could not load {genre_name}: {e}")
+                    continue
+
+                # Scroll to load lazy images (limited scrolls per page)
+                _scroll_to_load_all(page, max_scrolls=10)
+                covers = _extract_covers_from_page(page)
+                added = _store_covers(
+                    covers,
+                    genre_override=genre_name.replace("-", " ").title() if genre_name != "all" else None,
+                )
+                print(f"    -> {added} new covers (total: {total})")
+
+                # Also follow pagination for this genre
+                paginated = _scrape_paginated(page, genre_url, max_pages=max_pages_per_genre)
+                added = _store_covers(
+                    paginated,
+                    genre_override=genre_name.replace("-", " ").title() if genre_name != "all" else None,
+                )
+                if added:
+                    print(f"    -> {added} more from pagination (total: {total})")
+
+                time.sleep(1)
 
             browser.close()
 

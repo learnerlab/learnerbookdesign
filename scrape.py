@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Run scraper to populate the database with book covers from ineedabookcover.com."""
-from database import init_db
+from database import init_db, get_cover_count
 from scrapers.ineedabookcover import scrape_ineedabookcover
 
 init_db()
+
+existing = get_cover_count()
+if existing > 0:
+    print(f"Database already has {existing} covers — skipping scrape.")
+    raise SystemExit(0)
 
 print("=" * 60)
 print("  Book Cover Swiper - Scraper")
@@ -16,4 +21,3 @@ total = scrape_ineedabookcover()
 print(f"\n{'=' * 60}")
 print(f"  Total covers added: {total}")
 print(f"{'=' * 60}")
-print("\nRun the app with: python app.py")
