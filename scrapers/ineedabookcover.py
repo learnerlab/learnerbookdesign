@@ -12,6 +12,12 @@ import os
 import time
 import sys
 
+# Ensure Playwright can find browsers installed by build.sh on Render
+if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+    render_pw_path = "/opt/render/project/.playwright"
+    if os.path.isdir(render_pw_path):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = render_pw_path
+
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:

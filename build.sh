@@ -5,7 +5,12 @@ set -o errexit
 pip install --upgrade pip
 pip install -r requirements.txt
 
+# Store Playwright browsers inside the project directory so they survive
+# from build into runtime (Render wipes ~/.cache between build and deploy).
+export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.playwright
+
 # Install Playwright Chromium with its system-level dependencies.
-# --with-deps installs the required OS packages (libnss3, libatk, etc.)
-# that headless Chromium needs on Render's Ubuntu-based environment.
 playwright install --with-deps chromium
+
+echo "Chromium installed at: $PLAYWRIGHT_BROWSERS_PATH"
+ls -la "$PLAYWRIGHT_BROWSERS_PATH" || true
