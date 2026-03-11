@@ -9,8 +9,9 @@ pip install -r requirements.txt
 # from build into runtime (Render wipes ~/.cache between build and deploy).
 export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.playwright
 
-# Install Playwright Chromium with its system-level dependencies.
-playwright install --with-deps chromium
+# Install Playwright Chromium (without --with-deps to avoid su/sudo failures
+# on Render). Render's base image includes most required system libraries.
+playwright install chromium
 
 echo "Chromium installed at: $PLAYWRIGHT_BROWSERS_PATH"
 ls -la "$PLAYWRIGHT_BROWSERS_PATH" || true

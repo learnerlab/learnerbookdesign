@@ -41,7 +41,7 @@ def _ensure_chromium_installed():
     print("  [INFO] Chromium not found — installing now (one-time)...")
     try:
         result = subprocess.run(
-            ["playwright", "install", "--with-deps", "chromium"],
+            ["playwright", "install", "chromium"],
             capture_output=True, text=True, timeout=300,
         )
         if result.returncode == 0:
