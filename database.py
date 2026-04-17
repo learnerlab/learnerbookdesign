@@ -101,6 +101,28 @@ if DATABASE_URL:
                 conn.rollback()
                 return None
 
+    def upsert_cover(title, author=None, designer=None, genre=None,
+                     image_url="", source=None, source_url=None, year=None):
+        """Insert a new cover, or update an existing one (matched by image_url).
+        Only overwrites fields where the new value is non-empty."""
+        with get_db_context() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO covers (title, author, designer, genre, image_url, source, source_url, year)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (image_url) DO UPDATE SET
+                    title = COALESCE(NULLIF(EXCLUDED.title, ''), covers.title),
+                    author = COALESCE(NULLIF(EXCLUDED.author, ''), covers.author),
+                    designer = COALESCE(NULLIF(EXCLUDED.designer, ''), covers.designer),
+                    genre = COALESCE(NULLIF(EXCLUDED.genre, ''), covers.genre),
+                    source = COALESCE(NULLIF(EXCLUDED.source, ''), covers.source),
+                    source_url = COALESCE(NULLIF(EXCLUDED.source_url, ''), covers.source_url),
+                    year = COALESCE(NULLIF(EXCLUDED.year, ''), covers.year)
+                RETURNING id
+            """, (title, author, designer, genre, image_url, source, source_url, year))
+            row = cur.fetchone()
+            return row[0] if row else None
+
     def get_unswiped_covers(limit=20):
         with get_db_context() as conn:
             cur = conn.cursor()
@@ -271,6 +293,26 @@ else:
                 return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
             except sqlite3.IntegrityError:
                 return None
+
+    def upsert_cover(title, author=None, designer=None, genre=None,
+                     image_url="", source=None, source_url=None, year=None):
+        """Insert a new cover, or update an existing one (matched by image_url).
+        Only overwrites fields where the new value is non-empty."""
+        with get_db_context() as conn:
+            conn.execute("""
+                INSERT INTO covers (title, author, designer, genre, image_url, source, source_url, year)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(image_url) DO UPDATE SET
+                    title = COALESCE(NULLIF(excluded.title, ''), title),
+                    author = COALESCE(NULLIF(excluded.author, ''), author),
+                    designer = COALESCE(NULLIF(excluded.designer, ''), designer),
+                    genre = COALESCE(NULLIF(excluded.genre, ''), genre),
+                    source = COALESCE(NULLIF(excluded.source, ''), source),
+                    source_url = COALESCE(NULLIF(excluded.source_url, ''), source_url),
+                    year = COALESCE(NULLIF(excluded.year, ''), year)
+            """, (title, author, designer, genre, image_url, source, source_url, year))
+            row = conn.execute("SELECT id FROM covers WHERE image_url = ?", (image_url,)).fetchone()
+            return row[0] if row else None
 
     def get_unswiped_covers(limit=20):
         with get_db_context() as conn:
