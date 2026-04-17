@@ -19,7 +19,6 @@ Options (edit at top of file):
     DEBUG_DOM = True    # Dumps DOM structure for first few items so you can
                           see what's actually there if things break
     HEADLESS = True     # Set False to watch what the browser is doing
-    SCRAPE_LISTINGS = True   # Also scrape /book-covers/ listings as fallback
 """
 import json
 import os
@@ -36,7 +35,6 @@ except ImportError:
 # ─── Options ──────────────────────────────────────────────────────────
 DEBUG_DOM = True
 HEADLESS = True
-SCRAPE_LISTINGS = True
 MAX_DESIGNERS = None  # set to int for testing, e.g. 5
 # ──────────────────────────────────────────────────────────────────────
 
@@ -45,27 +43,6 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 SEED_FILE = os.path.join(SEED_DIR, "covers_seed.json")
 
 DESIGNERS_URL = "/designers/"
-GENRE_PAGES = [
-    "/book-covers/",
-    "/book-covers/?_genre=fiction",
-    "/book-covers/?_genre=literary-fiction",
-    "/book-covers/?_genre=nonfiction",
-    "/book-covers/?_genre=memoir",
-    "/book-covers/?_genre=biography",
-    "/book-covers/?_genre=self-help",
-    "/book-covers/?_genre=fantasy",
-    "/book-covers/?_genre=thriller",
-    "/book-covers/?_genre=mystery",
-    "/book-covers/?_genre=romance",
-    "/book-covers/?_genre=science-fiction",
-    "/book-covers/?_genre=horror",
-    "/book-covers/?_genre=poetry",
-    "/book-covers/?_genre=history",
-    "/book-covers/?_genre=food",
-    "/book-covers/?_genre=art",
-    "/book-covers/?_genre=children",
-    "/book-covers/?_genre=young-adult",
-]
 
 JUNK_TITLES = {
     "fiction", "nonfiction", "non-fiction", "literary fiction", "art",
@@ -434,105 +411,6 @@ def scrape_designer_page(page, designer_url):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Phase 3 (optional): Book covers listings fallback
-# ─────────────────────────────────────────────────────────────────────
-
-def scrape_book_covers_listings(page, existing_images):
-    """Fall back to the /book-covers/ listings for any images we didn't
-    get from designer pages. These won't have designer info."""
-    extras = []
-    seen = set(existing_images)
-
-    for genre_path in GENRE_PAGES:
-        genre_name = genre_path.split("=")[-1].replace("-", " ").title() if "=" in genre_path else ""
-        display = genre_name or "all"
-        print(f"\n  Scanning {display}...")
-
-        try:
-            page.goto(BASE_URL + genre_path, timeout=30000)
-            page.wait_for_load_state("networkidle", timeout=15000)
-        except Exception as e:
-            print(f"    [ERROR] {e}")
-            continue
-
-        _scroll_and_load(page, label=f"listing: {display}")
-
-        # Debug-dump the first listing page
-        if genre_path == GENRE_PAGES[0]:
-            _debug_dump_dom(page, f"listing: {display}", sample_count=3)
-
-        added = 0
-        try:
-            images = page.query_selector_all("img")
-            for img in images:
-                try:
-                    src = img.get_attribute("src") or img.get_attribute("data-src") or ""
-                    alt = img.get_attribute("alt") or ""
-                    if not _is_real_cover_image(src, alt):
-                        continue
-                    w = img.get_attribute("width")
-                    if w and w.isdigit() and int(w) < 80:
-                        continue
-
-                    img_url = _abs(src)
-                    if img_url in seen:
-                        continue
-                    seen.add(img_url)
-
-                    # Try multiple strategies to find the detail URL
-                    detail_url = img.evaluate("""el => {
-                        // Strategy 1: parent <a>
-                        let a = el.closest('a');
-                        if (a && a.href) return a.href;
-                        // Strategy 2: sibling <a> in same card
-                        let card = el.closest('article, .card, [class*="card"], [class*="cover"], li, .post');
-                        if (card) {
-                            const link = card.querySelector('a[href*="/book-covers/"]');
-                            if (link) return link.href;
-                        }
-                        // Strategy 3: data-href/data-link on image or parent
-                        let cur = el;
-                        while (cur) {
-                            if (cur.dataset && (cur.dataset.href || cur.dataset.link || cur.dataset.url)) {
-                                return cur.dataset.href || cur.dataset.link || cur.dataset.url;
-                            }
-                            cur = cur.parentElement;
-                        }
-                        return '';
-                    }""")
-                    detail_url = _abs(detail_url)
-                    if not _is_detail_page_url(detail_url):
-                        detail_url = ""
-
-                    title = alt.strip()
-                    if (not title or title.lower() in JUNK_TITLES) and detail_url:
-                        slug = detail_url.rstrip("/").split("/")[-1]
-                        title = slug.replace("-", " ").title()
-                    if not title or title.lower() in JUNK_TITLES:
-                        continue
-
-                    extras.append({
-                        "title": title,
-                        "designer": "",
-                        "image_url": img_url,
-                        "source_url": detail_url.rstrip("/") + "/" if detail_url else "",
-                        "genre": genre_name,
-                        "author": "",
-                        "source": "I Need a Book Cover",
-                    })
-                    added += 1
-                except Exception:
-                    continue
-        except Exception as e:
-            print(f"    [ERROR] {e}")
-
-        print(f"    -> {added} new covers (total extras: {len(extras)})")
-        time.sleep(1)
-
-    return extras
-
-
-# ─────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────
 
@@ -542,8 +420,8 @@ def scrape():
 
     print("=" * 60)
     print("  Scraping ineedabookcover.com")
-    print("  Primary source: /designers/ (designer-attributed covers)")
-    print(f"  DEBUG_DOM={DEBUG_DOM}  HEADLESS={HEADLESS}  SCRAPE_LISTINGS={SCRAPE_LISTINGS}")
+    print("  Source: /designers/ (every cover has designer attribution)")
+    print(f"  DEBUG_DOM={DEBUG_DOM}  HEADLESS={HEADLESS}")
     print("=" * 60)
 
     with sync_playwright() as p:
@@ -587,13 +465,6 @@ def scrape():
             time.sleep(0.4)
 
         print(f"\n[Phase 2 complete] {len(all_covers)} covers from {len(designer_urls)} designers")
-
-        # Phase 3: Also scrape /book-covers/ listings (fallback for variety)
-        if SCRAPE_LISTINGS:
-            print(f"\n[Phase 3] Scraping /book-covers/ listings for additional covers...")
-            extras = scrape_book_covers_listings(page, seen_images)
-            print(f"  Added {len(extras)} extra covers without designer attribution")
-            all_covers.extend(extras)
 
         browser.close()
 
