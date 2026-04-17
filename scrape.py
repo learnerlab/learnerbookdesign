@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Populate the database with book covers.
 
-Always runs the seed loader in upsert mode — inserts new covers and
-backfills designer/title/etc. on existing covers. User swipes are preserved.
+Only runs the seed loader if the DB hasn't already been fully loaded.
+Compares cover count against seed file size — if DB has >= seed count,
+the previous load finished successfully and we skip (fast boot).
+Otherwise, runs upsert to load/finish the import.
 
-Falls back to Open Library API only if the seed file is missing AND
-the DB has no covers yet.
+To force a full re-import, set FORCE_RESEED=true.
 """
+import os
+import json
 from database import init_db, get_cover_count
-from scrapers.seed_loader import load_seed_covers
+from scrapers.seed_loader import load_seed_covers, SEED_FILE
 from scrapers.openlibrary import scrape_openlibrary
 
 init_db()
@@ -17,20 +20,37 @@ print("=" * 60)
 print("  Book Cover Swiper - Loading Covers")
 print("=" * 60)
 
-before = get_cover_count()
-print(f"\nDatabase currently has {before} covers")
+cover_count = get_cover_count()
+print(f"\nDatabase currently has {cover_count} covers")
 
-# Always upsert from seed file (preserves existing swipes, backfills data)
-print("Loading seed data from ineedabookcover.com...")
-processed = load_seed_covers()
+# Count how many covers are in the seed file
+seed_count = 0
+seed_path = os.path.normpath(SEED_FILE)
+if os.path.exists(seed_path):
+    try:
+        with open(seed_path) as f:
+            seed_count = len(json.load(f))
+    except Exception as e:
+        print(f"Could not read seed file: {e}")
 
-after = get_cover_count()
+force = os.environ.get("FORCE_RESEED", "").lower() in ("1", "true", "yes")
 
-if processed == 0 and before == 0:
-    print("\nNo seed data found. Fetching from Open Library API...")
+if force:
+    print("FORCE_RESEED set — running upsert regardless of current state")
+    load_seed_covers()
+elif seed_count > 0 and cover_count >= seed_count:
+    print(f"DB already has {cover_count} covers (seed has {seed_count}). Skipping import.")
+    print("Set FORCE_RESEED=true to re-import the seed file.")
+elif seed_count > 0:
+    print(f"Seed has {seed_count} covers, DB has {cover_count} — loading seed...")
+    load_seed_covers()
+elif cover_count == 0:
+    print("\nNo seed data found and DB is empty. Fetching from Open Library API...")
     scrape_openlibrary()
-    after = get_cover_count()
+else:
+    print("No seed file and DB already populated. Nothing to do.")
 
+final = get_cover_count()
 print(f"\n{'=' * 60}")
-print(f"  Covers in DB: {after}  (was {before})")
+print(f"  Covers in DB: {final}")
 print(f"{'=' * 60}")
