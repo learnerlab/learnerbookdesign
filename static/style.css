@@ -20,9 +20,15 @@
     --border-light: #f0ece6;
     --shadow: rgba(0, 0, 0, 0.06);
     --shadow-hover: rgba(0, 0, 0, 0.12);
-    --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-display: 'Fraunces', 'Playfair Display', Georgia, 'Times New Roman', serif;
     --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'Space Grotesk', monospace;
+}
+
+/* Fraunces variable font tuning */
+h1, h2, h3, h4, .stat-card .number {
+    font-family: var(--font-display);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
 }
 
 body {
@@ -140,13 +146,14 @@ nav a.active {
 
 .card-info h3 {
     font-family: var(--font-display);
-    font-size: 1.05rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.3rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }
 
 .card-info .author {
@@ -270,10 +277,11 @@ nav a.active {
 
 .empty-state h2 {
     font-family: var(--font-display);
-    font-size: 1.6rem;
-    font-weight: 600;
+    font-size: 2.4rem;
+    font-weight: 700;
     margin-bottom: 0.8rem;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.035em;
+    line-height: 1;
 }
 
 .empty-state p {
@@ -343,13 +351,14 @@ nav a.active {
 
 .like-card .info h4 {
     font-family: var(--font-display);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     font-weight: 600;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.35rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }
 
 .like-card .info .detail {
@@ -413,22 +422,35 @@ nav a.active {
 
 .page-header {
     text-align: center;
-    padding: 3rem 2rem 2rem;
+    padding: 4rem 2rem 2.5rem;
 }
 
 .page-header h1 {
     font-family: var(--font-display);
-    font-size: 2.4rem;
+    font-size: clamp(3rem, 7vw, 5.5rem);
     font-weight: 700;
-    margin-bottom: 0.5rem;
-    letter-spacing: -0.03em;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+    font-variation-settings: "opsz" 144, "SOFT" 40;
+}
+
+.page-header h1 em {
+    font-style: italic;
+    font-weight: 400;
+    font-variation-settings: "opsz" 144, "SOFT" 50;
 }
 
 .page-header p {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     font-style: italic;
     font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.005em;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.5;
 }
 
 /* --- Analytics Page --- */
@@ -456,10 +478,12 @@ nav a.active {
 
 .stat-card .number {
     font-family: var(--font-display);
-    font-size: 2.2rem;
+    font-size: 3rem;
     font-weight: 700;
     color: var(--text);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variation-settings: "opsz" 144, "SOFT" 40;
 }
 
 .stat-card .label {
@@ -482,12 +506,14 @@ nav a.active {
 
 .section h2 {
     font-family: var(--font-display);
-    font-size: 1.3rem;
-    font-weight: 600;
+    font-size: 1.9rem;
+    font-weight: 700;
     margin-bottom: 1.2rem;
     padding-bottom: 0.8rem;
     border-bottom: 1px solid var(--border-light);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variation-settings: "opsz" 144, "SOFT" 40;
 }
 
 .designer-row {
@@ -601,6 +627,8 @@ nav a.active {
     nav { gap: 0.25rem; padding: 0.8rem 1rem; }
     nav a { font-size: 0.7rem; padding: 0.4rem 0.8rem; }
     .likes-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; padding: 0 1rem 1rem; }
-    .page-header h1 { font-size: 1.8rem; }
+    .page-header { padding: 2.5rem 1rem 1.5rem; }
+    .section h2 { font-size: 1.5rem; }
+    .stat-card .number { font-size: 2.2rem; }
     .analytics-container { padding: 0 1rem 1rem; }
 }
