@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """
 Run this LOCALLY to scrape ineedabookcover.com and save to a seed JSON file.
-The seed file gets committed and deployed — no Playwright needed on Render.
 
-This scraper:
-1. Finds cover images on listing pages (proven approach from old scraper)
-2. Extracts detail page URLs from parent <a> tags around each image
-3. Visits each detail page to extract designer, title, author, genre
-4. Falls back to image alt text / URL slug when no detail page exists
+Strategy: Scrape designer profile pages instead of the /book-covers/ listing.
+Each designer's page lists their covers, so designer attribution is
+built-in (no need to visit each detail page separately).
+
+Phase 1: Get list of all designer URLs from /designers/
+Phase 2: Visit each designer's profile page, extract their covers
+Phase 3 (optional): Also scrape /book-covers/ listings for additional covers
+        where we can find detail page links
 
 Usage:
     pip install playwright && playwright install chromium
     python scrapers/scrape_local.py
+
+Options (edit at top of file):
+    DEBUG_DOM = True    # Dumps DOM structure for first few items so you can
+                          see what's actually there if things break
+    HEADLESS = True     # Set False to watch what the browser is doing
+    SCRAPE_LISTINGS = True   # Also scrape /book-covers/ listings as fallback
 """
 import json
 import os
@@ -25,10 +33,18 @@ except ImportError:
     print("Playwright not installed. Run: pip install playwright && playwright install chromium")
     sys.exit(1)
 
+# ─── Options ──────────────────────────────────────────────────────────
+DEBUG_DOM = True
+HEADLESS = True
+SCRAPE_LISTINGS = True
+MAX_DESIGNERS = None  # set to int for testing, e.g. 5
+# ──────────────────────────────────────────────────────────────────────
+
 BASE_URL = "https://ineedabookcover.com"
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 SEED_FILE = os.path.join(SEED_DIR, "covers_seed.json")
 
+DESIGNERS_URL = "/designers/"
 GENRE_PAGES = [
     "/book-covers/",
     "/book-covers/?_genre=fiction",
@@ -57,12 +73,13 @@ JUNK_TITLES = {
     "romance", "science fiction", "sci-fi", "horror", "poetry", "history",
     "food", "children", "young adult", "ya", "social science",
     "all", "home", "book covers", "covers", "i need a book cover",
+    "designers", "book cover designers", "about", "blog", "submit",
     "red", "orange", "yellow", "green", "blue", "purple", "pink",
     "black", "white", "brown", "grey", "gray",
 }
 
 
-def _make_absolute(url):
+def _abs(url):
     if not url:
         return ""
     if url.startswith("//"):
@@ -75,7 +92,6 @@ def _make_absolute(url):
 
 
 def _is_real_cover_image(src, alt=""):
-    """Filter out non-cover images: logos, icons, SVGs, placeholders, tiny imgs."""
     if not src:
         return False
     if "data:image" in src or "svg+xml" in src:
@@ -89,15 +105,12 @@ def _is_real_cover_image(src, alt=""):
 
 
 def _is_detail_page_url(url):
-    """Check if a URL points to an individual cover detail page."""
     if not url:
         return False
-    # Must be on the site, under /book-covers/, with an actual slug
     m = re.match(r"https?://(?:www\.)?ineedabookcover\.com/book-covers/([^/?#]+)/?$", url)
     if not m:
         return False
     slug = m.group(1)
-    # Skip genre filter pages, color filters, morph animations
     if slug.lower() in JUNK_TITLES:
         return False
     if re.match(r"^colors?-filter", slug, re.IGNORECASE):
@@ -107,15 +120,26 @@ def _is_detail_page_url(url):
     return True
 
 
-def _scroll_and_load(page, max_scrolls=20):
-    """Scroll down and click 'Load More' to reveal all covers."""
+def _is_designer_profile_url(url):
+    if not url:
+        return False
+    m = re.match(r"https?://(?:www\.)?ineedabookcover\.com/designers/([^/?#]+)/?$", url)
+    if not m:
+        return False
+    slug = m.group(1)
+    if slug.lower() in ("", "all", "index"):
+        return False
+    return True
+
+
+def _scroll_and_load(page, max_scrolls=30, label=""):
+    """Aggressive scroll + click Load More until page stops growing."""
     prev_height = 0
     stable = 0
     for i in range(max_scrolls):
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         time.sleep(1.5)
-        # Try clicking load-more buttons
-        for btn_text in ["Load More", "Show More", "Load more", "Show more"]:
+        for btn_text in ["Load More", "Show More", "Load more", "Show more", "View More"]:
             try:
                 btn = page.locator(f"button:has-text('{btn_text}'), a:has-text('{btn_text}')").first
                 if btn.is_visible(timeout=500):
@@ -134,369 +158,455 @@ def _scroll_and_load(page, max_scrolls=20):
         prev_height = cur_height
 
 
-def _extract_covers_from_listing(page, genre_name):
-    """
-    Extract cover entries from a listing page using images (proven approach).
-    For each image, also try to get the parent <a> href as a detail page URL.
-    """
-    entries = []
-    images = page.query_selector_all("img")
+def _debug_dump_dom(page, label, sample_count=3):
+    """Print DOM structure of a few cover-ish elements so we can see
+    what the page actually looks like if parsing fails."""
+    if not DEBUG_DOM:
+        return
 
-    for img in images:
-        try:
-            src = img.get_attribute("src") or img.get_attribute("data-src") or ""
-            alt = img.get_attribute("alt") or ""
+    print(f"\n  ── DEBUG DOM DUMP: {label} ──")
 
-            if not _is_real_cover_image(src, alt):
-                continue
+    # Count anchor tags pointing to book-covers pages
+    try:
+        all_anchors = page.query_selector_all("a[href]")
+        book_cover_links = []
+        designer_links = []
+        for a in all_anchors:
+            href = _abs(a.get_attribute("href") or "")
+            if _is_detail_page_url(href):
+                book_cover_links.append(href)
+            elif _is_designer_profile_url(href):
+                designer_links.append(href)
+        print(f"    Total <a> tags: {len(all_anchors)}")
+        print(f"    Links to /book-covers/<slug>/: {len(set(book_cover_links))}")
+        print(f"    Links to /designers/<slug>/: {len(set(designer_links))}")
+        if book_cover_links:
+            print(f"    Sample cover links:")
+            for u in list(set(book_cover_links))[:5]:
+                print(f"      {u}")
+        if designer_links:
+            print(f"    Sample designer links:")
+            for u in list(set(designer_links))[:5]:
+                print(f"      {u}")
+    except Exception as e:
+        print(f"    [ERROR inspecting anchors] {e}")
 
-            # Skip tiny images (icons, buttons)
-            width = img.get_attribute("width")
-            height = img.get_attribute("height")
-            if width and width.isdigit() and int(width) < 80:
-                continue
-            if height and height.isdigit() and int(height) < 80:
-                continue
+    # Dump structure around first few images
+    try:
+        images = page.query_selector_all("img")
+        real_imgs = [
+            img for img in images
+            if _is_real_cover_image(
+                img.get_attribute("src") or img.get_attribute("data-src") or "",
+                img.get_attribute("alt") or ""
+            )
+        ]
+        print(f"    Total <img>: {len(images)}, real covers: {len(real_imgs)}")
 
-            image_url = _make_absolute(src)
+        for i, img in enumerate(real_imgs[:sample_count]):
+            outer = img.evaluate("""el => {
+                const parent = el.parentElement;
+                const grandparent = parent ? parent.parentElement : null;
+                const closest_a = el.closest('a');
+                return {
+                    tag: el.tagName,
+                    src: el.src || el.getAttribute('data-src'),
+                    alt: el.alt,
+                    parent_tag: parent ? parent.tagName : null,
+                    parent_class: parent ? parent.className : null,
+                    grandparent_tag: grandparent ? grandparent.tagName : null,
+                    grandparent_class: grandparent ? grandparent.className : null,
+                    closest_a_href: closest_a ? closest_a.href : null,
+                    parent_html: parent ? parent.outerHTML.substring(0, 400) : null,
+                };
+            }""")
+            print(f"\n    [Image {i+1}]")
+            print(f"      src: {(outer['src'] or '')[:100]}")
+            print(f"      alt: {outer['alt']}")
+            print(f"      parent: <{outer['parent_tag']} class='{outer['parent_class']}'>")
+            print(f"      grandparent: <{outer['grandparent_tag']} class='{outer['grandparent_class']}'>")
+            print(f"      closest <a> href: {outer['closest_a_href']}")
+            if outer['parent_html']:
+                print(f"      parent outerHTML: {outer['parent_html']}")
+    except Exception as e:
+        print(f"    [ERROR inspecting images] {e}")
 
-            # Try to find the parent <a> link (detail page URL)
-            detail_url = ""
+    print("  ── END DEBUG DUMP ──\n")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 1: Get designer list
+# ─────────────────────────────────────────────────────────────────────
+
+def scrape_designer_list(page):
+    """Get URLs of all individual designer profile pages."""
+    print(f"\n  Fetching designer directory: {BASE_URL + DESIGNERS_URL}")
+    try:
+        page.goto(BASE_URL + DESIGNERS_URL, timeout=30000)
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception as e:
+        print(f"  [ERROR] {e}")
+        return []
+
+    _scroll_and_load(page, label="designers directory")
+    _debug_dump_dom(page, "designers directory", sample_count=2)
+
+    designer_urls = set()
+    try:
+        anchors = page.query_selector_all("a[href]")
+        for a in anchors:
             try:
-                href = img.evaluate(
-                    "el => { const a = el.closest('a'); return a ? a.href : ''; }"
-                )
-                if href:
-                    href = _make_absolute(href)
-                    if _is_detail_page_url(href):
-                        detail_url = href.rstrip("/") + "/"
+                href = _abs(a.get_attribute("href") or "")
+                if _is_designer_profile_url(href):
+                    designer_urls.add(href.rstrip("/") + "/")
             except Exception:
-                pass
+                continue
+    except Exception as e:
+        print(f"  [ERROR reading anchors] {e}")
 
-            # Also check if the image itself is wrapped in an onclick or data attr
-            if not detail_url:
-                try:
-                    data_link = img.get_attribute("data-link") or img.get_attribute("data-href") or ""
-                    if data_link:
-                        data_link = _make_absolute(data_link)
-                        if _is_detail_page_url(data_link):
-                            detail_url = data_link.rstrip("/") + "/"
-                except Exception:
-                    pass
-
-            entries.append({
-                "image_url": image_url,
-                "detail_url": detail_url,
-                "alt_text": alt.strip(),
-                "genre": genre_name,
-            })
-        except Exception:
-            continue
-
-    return entries
+    designer_urls = sorted(designer_urls)
+    print(f"  Found {len(designer_urls)} designer profile URLs")
+    if designer_urls:
+        print(f"  Samples:")
+        for u in designer_urls[:5]:
+            print(f"    {u}")
+    return designer_urls
 
 
-def _parse_title_designer_from_meta(page):
-    """
-    Page titles on ineedabookcover.com follow patterns like:
-      "Tyler Comrie's design for 'Carnality' by Lina Wolff"
-      "Chip Kidd's design for "Dry" by Augusten Burroughs"
-      "Keith Hayes' design for "The Goldfinch" by Donna Tartt"
-      "Blink | I Need a Book Cover"
-      "Lapvona cover art | I Need a Book Cover"
-      "Big Swiss book cover information from INeedABookCover.com"
-    """
-    title_tag = ""
+# ─────────────────────────────────────────────────────────────────────
+# Phase 2: Scrape each designer page
+# ─────────────────────────────────────────────────────────────────────
+
+def scrape_designer_page(page, designer_url):
+    """Visit a designer's profile page and extract all their covers."""
     try:
-        title_tag = page.title() or ""
-    except Exception:
-        pass
-
-    designer = ""
-    book_title = ""
-    author = ""
-
-    # Pattern: "Designer's design for 'Title' by Author"
-    m = re.match(
-        r"""^(.+?)(?:'s|'s|\u2019s)\s+design\s+for\s+[\"'"'\u201c\u201d](.+?)[\"'"'\u201c\u201d](?:\s+by\s+(.+?))?(?:\s*\||\s*–|\s*-|\s*$)""",
-        title_tag, re.IGNORECASE
-    )
-    if m:
-        designer = m.group(1).strip()
-        book_title = m.group(2).strip()
-        author = (m.group(3) or "").strip()
-        author = re.sub(r"\s*\|.*$", "", author).strip()
-        author = re.sub(r"\s*–.*$", "", author).strip()
-        return book_title, designer, author
-
-    # Pattern: "Title | I Need a Book Cover"
-    m = re.match(r"^(.+?)\s*\|\s*I Need a Book Cover", title_tag, re.IGNORECASE)
-    if m:
-        book_title = m.group(1).strip()
-        # Remove suffixes like "cover art", "book cover information"
-        book_title = re.sub(r"\s+(?:cover art|book cover.*)", "", book_title, flags=re.IGNORECASE).strip()
-
-    # Pattern: "Title book cover information from INeedABookCover.com"
-    if not book_title:
-        m = re.match(r"^(.+?)\s+(?:cover art|book cover|information)\s+", title_tag, re.IGNORECASE)
-        if m:
-            book_title = m.group(1).strip()
-
-    return book_title, designer, author
-
-
-def _scrape_detail_page(page, url):
-    """Visit an individual cover page and extract designer, title, author, genre."""
-    try:
-        page.goto(url, timeout=25000)
+        page.goto(designer_url, timeout=25000)
         page.wait_for_load_state("domcontentloaded", timeout=10000)
         time.sleep(1)
-    except Exception as e:
-        return None
+    except Exception:
+        return None, []
 
-    result = {"title": "", "designer": "", "author": "", "genre": "", "image_url": ""}
-
-    # --- 1. Parse <title> tag (most reliable for designer) ---
-    title_text, designer, author = _parse_title_designer_from_meta(page)
-    result["designer"] = designer
-    result["author"] = author
-    if title_text:
-        result["title"] = title_text
-
-    # --- 2. Get <h1> for the book name ---
+    # Get the designer name from h1 / title
+    designer_name = ""
     try:
         h1 = page.locator("h1").first
         if h1.is_visible(timeout=1000):
-            h1_text = h1.inner_text().strip()
-            if h1_text and h1_text.lower() not in JUNK_TITLES:
-                result["title"] = h1_text
+            designer_name = h1.inner_text().strip()
     except Exception:
         pass
-
-    # --- 3. Get main cover image ---
-    try:
-        images = page.query_selector_all("img")
-        best_img = None
-        best_area = 0
-        for img in images:
-            src = img.get_attribute("src") or img.get_attribute("data-src") or ""
-            if not _is_real_cover_image(src):
-                continue
-            try:
-                box = img.bounding_box()
-                if box:
-                    area = box["width"] * box["height"]
-                    if area > best_area:
-                        best_area = area
-                        best_img = src
-            except Exception:
-                if not best_img:
-                    best_img = src
-        if best_img:
-            result["image_url"] = _make_absolute(best_img)
-    except Exception:
-        pass
-
-    # --- 4. Extract designer from body text if not in title ---
-    if not result["designer"]:
+    if not designer_name:
         try:
-            body_text = page.inner_text("body")
-            for pattern in [
-                r"(?:Cover\s+)?[Dd]esign(?:er|ed)?\s*(?:by|:)\s*([A-Z][A-Za-z\s\.\-''\u2019]+?)(?:\n|\.|,|\||–|—|\(|$)",
-                r"[Aa]rt\s+(?:[Dd]irection|[Dd]irector)\s*(?:by|:)\s*([A-Z][A-Za-z\s\.\-''\u2019]+?)(?:\n|\.|,|\||–|—|\(|$)",
-                r"[Jj]acket\s+(?:design|art)\s*(?:by|:)\s*([A-Z][A-Za-z\s\.\-''\u2019]+?)(?:\n|\.|,|\||–|—|\(|$)",
-            ]:
-                m = re.search(pattern, body_text)
-                if m:
-                    name = m.group(1).strip().rstrip(".,;:")
-                    if 2 < len(name) < 50 and not any(w in name.lower() for w in [
-                        "book", "cover", "genre", "price", "cart", "publish",
-                        "page", "print", "copyright", "edition", "click",
-                    ]):
-                        result["designer"] = name
-                        break
+            title = page.title() or ""
+            # Patterns: "Jane Doe | I Need a Book Cover", "Jane Doe - Book Cover Designer"
+            m = re.match(r"^(.+?)\s*[|\-–—]", title)
+            if m:
+                designer_name = m.group(1).strip()
+                designer_name = re.sub(r"(?i)\b(book cover designer|designer)\b", "", designer_name).strip(" -\u2013\u2014")
         except Exception:
             pass
 
-    # --- 5. Extract designer from links to /designers/ profile pages ---
-    if not result["designer"]:
+    # Derive from URL slug as last resort
+    if not designer_name:
+        slug = designer_url.rstrip("/").split("/")[-1]
+        designer_name = slug.replace("-", " ").title()
+
+    # Scroll to load all of this designer's covers
+    _scroll_and_load(page, max_scrolls=10, label=f"designer: {designer_name}")
+
+    # Find all cover images on this page
+    covers = []
+    seen_images = set()
+    try:
+        # First, map out all <a> tags pointing to detail pages — we'll use these
+        # to associate images with detail URLs
+        detail_anchors = []
         try:
-            designer_links = page.locator("a[href*='/designers/']").all()
-            for link in designer_links:
+            anchors = page.query_selector_all("a[href]")
+            for a in anchors:
+                href = _abs(a.get_attribute("href") or "")
+                if _is_detail_page_url(href):
+                    # Capture the anchor's bounding box and its image if any
+                    info = a.evaluate("""el => {
+                        const img = el.querySelector('img') || (
+                            el.nextElementSibling && el.nextElementSibling.tagName === 'IMG'
+                              ? el.nextElementSibling : null
+                        );
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            href: el.href,
+                            text: (el.innerText || '').trim().substring(0, 200),
+                            img_src: img ? (img.src || img.getAttribute('data-src') || '') : '',
+                            img_alt: img ? img.alt : '',
+                            rect: {x: rect.left, y: rect.top, w: rect.width, h: rect.height}
+                        };
+                    }""")
+                    detail_anchors.append(info)
+        except Exception as e:
+            print(f"      [warn] couldn't map anchors: {e}")
+
+        # For each detail anchor, create a cover record
+        for info in detail_anchors:
+            img_src = info.get("img_src", "")
+            if img_src and _is_real_cover_image(img_src, info.get("img_alt", "")):
+                img_url = _abs(img_src)
+                if img_url in seen_images:
+                    continue
+                seen_images.add(img_url)
+
+                # Title: prefer anchor text (often the book title), then alt
+                title = info.get("text", "").strip()
+                if not title or title.lower() in JUNK_TITLES:
+                    title = info.get("img_alt", "").strip()
+                if not title or title.lower() in JUNK_TITLES:
+                    # Derive from URL slug
+                    slug = info["href"].rstrip("/").split("/")[-1]
+                    title = slug.replace("-", " ").title()
+
+                covers.append({
+                    "title": title,
+                    "designer": designer_name,
+                    "image_url": img_url,
+                    "source_url": info["href"].rstrip("/") + "/",
+                    "source": "I Need a Book Cover",
+                    "author": "",
+                    "genre": "",
+                })
+
+        # Fallback: find images that weren't associated with any detail link
+        # (still attribute them to this designer — we're on their page)
+        images = page.query_selector_all("img")
+        for img in images:
+            try:
+                src = img.get_attribute("src") or img.get_attribute("data-src") or ""
+                alt = img.get_attribute("alt") or ""
+                if not _is_real_cover_image(src, alt):
+                    continue
+
+                # Skip tiny images
+                w = img.get_attribute("width")
+                h = img.get_attribute("height")
+                if w and w.isdigit() and int(w) < 100:
+                    continue
+                if h and h.isdigit() and int(h) < 100:
+                    continue
+
+                img_url = _abs(src)
+                if img_url in seen_images:
+                    continue
+                seen_images.add(img_url)
+
+                # Try to find a detail URL for this image
+                detail_url = ""
                 try:
-                    text = link.inner_text().strip()
-                    href = link.get_attribute("href") or ""
-                    # Must be an individual designer page, not the directory
-                    if (text and 2 < len(text) < 50 and
-                            re.search(r"/designers/[a-z0-9]", href) and
-                            text.lower() not in ("designers", "book cover designers", "all designers")):
-                        result["designer"] = text
-                        break
+                    detail_url = img.evaluate(
+                        "el => { const a = el.closest('a'); return a && a.href ? a.href : ''; }"
+                    )
+                    detail_url = _abs(detail_url)
+                    if not _is_detail_page_url(detail_url):
+                        detail_url = ""
+                except Exception:
+                    pass
+
+                title = alt.strip()
+                if not title or title.lower() in JUNK_TITLES:
+                    if detail_url:
+                        slug = detail_url.rstrip("/").split("/")[-1]
+                        title = slug.replace("-", " ").title()
+
+                if not title or title.lower() in JUNK_TITLES:
+                    continue
+
+                covers.append({
+                    "title": title,
+                    "designer": designer_name,
+                    "image_url": img_url,
+                    "source_url": detail_url.rstrip("/") + "/" if detail_url else "",
+                    "source": "I Need a Book Cover",
+                    "author": "",
+                    "genre": "",
+                })
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"    [ERROR extracting from {designer_url}] {e}")
+
+    return designer_name, covers
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Phase 3 (optional): Book covers listings fallback
+# ─────────────────────────────────────────────────────────────────────
+
+def scrape_book_covers_listings(page, existing_images):
+    """Fall back to the /book-covers/ listings for any images we didn't
+    get from designer pages. These won't have designer info."""
+    extras = []
+    seen = set(existing_images)
+
+    for genre_path in GENRE_PAGES:
+        genre_name = genre_path.split("=")[-1].replace("-", " ").title() if "=" in genre_path else ""
+        display = genre_name or "all"
+        print(f"\n  Scanning {display}...")
+
+        try:
+            page.goto(BASE_URL + genre_path, timeout=30000)
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception as e:
+            print(f"    [ERROR] {e}")
+            continue
+
+        _scroll_and_load(page, label=f"listing: {display}")
+
+        # Debug-dump the first listing page
+        if genre_path == GENRE_PAGES[0]:
+            _debug_dump_dom(page, f"listing: {display}", sample_count=3)
+
+        added = 0
+        try:
+            images = page.query_selector_all("img")
+            for img in images:
+                try:
+                    src = img.get_attribute("src") or img.get_attribute("data-src") or ""
+                    alt = img.get_attribute("alt") or ""
+                    if not _is_real_cover_image(src, alt):
+                        continue
+                    w = img.get_attribute("width")
+                    if w and w.isdigit() and int(w) < 80:
+                        continue
+
+                    img_url = _abs(src)
+                    if img_url in seen:
+                        continue
+                    seen.add(img_url)
+
+                    # Try multiple strategies to find the detail URL
+                    detail_url = img.evaluate("""el => {
+                        // Strategy 1: parent <a>
+                        let a = el.closest('a');
+                        if (a && a.href) return a.href;
+                        // Strategy 2: sibling <a> in same card
+                        let card = el.closest('article, .card, [class*="card"], [class*="cover"], li, .post');
+                        if (card) {
+                            const link = card.querySelector('a[href*="/book-covers/"]');
+                            if (link) return link.href;
+                        }
+                        // Strategy 3: data-href/data-link on image or parent
+                        let cur = el;
+                        while (cur) {
+                            if (cur.dataset && (cur.dataset.href || cur.dataset.link || cur.dataset.url)) {
+                                return cur.dataset.href || cur.dataset.link || cur.dataset.url;
+                            }
+                            cur = cur.parentElement;
+                        }
+                        return '';
+                    }""")
+                    detail_url = _abs(detail_url)
+                    if not _is_detail_page_url(detail_url):
+                        detail_url = ""
+
+                    title = alt.strip()
+                    if (not title or title.lower() in JUNK_TITLES) and detail_url:
+                        slug = detail_url.rstrip("/").split("/")[-1]
+                        title = slug.replace("-", " ").title()
+                    if not title or title.lower() in JUNK_TITLES:
+                        continue
+
+                    extras.append({
+                        "title": title,
+                        "designer": "",
+                        "image_url": img_url,
+                        "source_url": detail_url.rstrip("/") + "/" if detail_url else "",
+                        "genre": genre_name,
+                        "author": "",
+                        "source": "I Need a Book Cover",
+                    })
+                    added += 1
                 except Exception:
                     continue
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"    [ERROR] {e}")
 
-    # --- 6. Extract genre from links ---
-    try:
-        genre_links = page.locator("a[href*='_genre=']").all()
-        for el in genre_links:
-            try:
-                text = el.inner_text().strip()
-                if text and text.lower() not in ("home", "book covers", "covers", "all", "") and len(text) < 40:
-                    result["genre"] = text
-                    break
-            except Exception:
-                continue
-    except Exception:
-        pass
+        print(f"    -> {added} new covers (total extras: {len(extras)})")
+        time.sleep(1)
 
-    return result
+    return extras
 
+
+# ─────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────
 
 def scrape():
     os.makedirs(SEED_DIR, exist_ok=True)
     all_covers = []
-    seen_images = set()
-    listing_entries = []
 
     print("=" * 60)
     print("  Scraping ineedabookcover.com")
-    print("  Phase 1: Finding cover images on listing pages")
+    print("  Primary source: /designers/ (designer-attributed covers)")
+    print(f"  DEBUG_DOM={DEBUG_DOM}  HEADLESS={HEADLESS}  SCRAPE_LISTINGS={SCRAPE_LISTINGS}")
     print("=" * 60)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
+        browser = p.chromium.launch(
+            headless=HEADLESS,
+            args=["--no-sandbox", "--disable-gpu"]
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             viewport={"width": 1440, "height": 900},
         )
         page = context.new_page()
 
-        # Phase 1: Find all cover images and their detail page links
-        for genre_path in GENRE_PAGES:
-            genre_name = genre_path.split("=")[-1].replace("-", " ").title() if "=" in genre_path else ""
-            display_name = genre_name or "all"
-            print(f"\n  Scanning {display_name}...")
+        # Phase 1: Get list of designers
+        print("\n[Phase 1] Discovering designers...")
+        designer_urls = scrape_designer_list(page)
 
-            try:
-                page.goto(BASE_URL + genre_path, timeout=30000)
-                page.wait_for_load_state("networkidle", timeout=15000)
-            except Exception as e:
-                print(f"    [ERROR] {e}")
-                continue
+        if MAX_DESIGNERS:
+            designer_urls = designer_urls[:MAX_DESIGNERS]
+            print(f"  (limited to first {MAX_DESIGNERS} for testing)")
 
-            _scroll_and_load(page)
-            entries = _extract_covers_from_listing(page, genre_name)
+        # Phase 2: Scrape each designer's page
+        print(f"\n[Phase 2] Scraping {len(designer_urls)} designer profiles...")
 
-            new_count = 0
-            for entry in entries:
-                if entry["image_url"] not in seen_images:
-                    seen_images.add(entry["image_url"])
-                    listing_entries.append(entry)
-                    new_count += 1
+        seen_images = set()
+        for i, url in enumerate(designer_urls):
+            if (i + 1) % 10 == 0 or i == 0:
+                print(f"\n  [{i + 1}/{len(designer_urls)}] {len(all_covers)} covers collected so far...")
 
-            detail_count = sum(1 for e in entries if e["detail_url"] and e["image_url"] in seen_images)
-            print(f"    -> {new_count} new images found, {detail_count} with detail page links (total: {len(listing_entries)})")
-            time.sleep(1)
+            name, covers = scrape_designer_page(page, url)
+            new_for_designer = 0
+            for c in covers:
+                if c["image_url"] not in seen_images:
+                    seen_images.add(c["image_url"])
+                    all_covers.append(c)
+                    new_for_designer += 1
 
-        # Collect unique detail page URLs to visit
-        detail_urls = {}
-        for entry in listing_entries:
-            if entry["detail_url"] and entry["detail_url"] not in detail_urls:
-                detail_urls[entry["detail_url"]] = entry
+            if name and (i < 5 or (i + 1) % 10 == 0):
+                print(f"    {name}: {new_for_designer} new covers")
 
-        # Also scan ALL <a> tags from the last loaded page for any missed links
-        try:
-            all_anchors = page.query_selector_all("a[href]")
-            for a in all_anchors:
-                try:
-                    href = _make_absolute(a.get_attribute("href") or "")
-                    if _is_detail_page_url(href):
-                        url = href.rstrip("/") + "/"
-                        if url not in detail_urls:
-                            detail_urls[url] = None
-                except Exception:
-                    pass
-        except Exception:
-            pass
+            time.sleep(0.4)
 
-        print(f"\n{'=' * 60}")
-        print(f"  Phase 1 complete: {len(listing_entries)} cover images found")
-        print(f"  Detail pages to visit: {len(detail_urls)}")
-        print(f"{'=' * 60}")
+        print(f"\n[Phase 2 complete] {len(all_covers)} covers from {len(designer_urls)} designers")
 
-        # Phase 2: Visit detail pages to get designer info
-        if detail_urls:
-            print(f"\n  Phase 2: Scraping {len(detail_urls)} detail pages for designer info...")
-            print(f"  (est. {len(detail_urls) // 2} minutes)")
-
-            detail_data = {}
-            sorted_urls = sorted(detail_urls.keys())
-
-            for i, url in enumerate(sorted_urls):
-                if (i + 1) % 50 == 0 or i == 0:
-                    designers_so_far = sum(1 for d in detail_data.values() if d and d.get("designer"))
-                    print(f"    [{i + 1}/{len(sorted_urls)}] {designers_so_far} designers found so far...")
-
-                data = _scrape_detail_page(page, url)
-                if data:
-                    detail_data[url] = data
-
-                time.sleep(0.5)
-
-            print(f"    Done. Got data from {len(detail_data)} detail pages.")
-        else:
-            detail_data = {}
-            print("\n  No detail pages found — covers will be saved without designer info.")
+        # Phase 3: Also scrape /book-covers/ listings (fallback for variety)
+        if SCRAPE_LISTINGS:
+            print(f"\n[Phase 3] Scraping /book-covers/ listings for additional covers...")
+            extras = scrape_book_covers_listings(page, seen_images)
+            print(f"  Added {len(extras)} extra covers without designer attribution")
+            all_covers.extend(extras)
 
         browser.close()
-
-    # Phase 3: Merge listing entries with detail page data
-    print(f"\n  Phase 3: Merging data...")
-
-    for entry in listing_entries:
-        detail_url = entry.get("detail_url", "")
-        detail = detail_data.get(detail_url, {}) if detail_url else {}
-
-        # Use detail page image if available (usually higher quality)
-        image_url = detail.get("image_url") or entry["image_url"]
-
-        # Title: prefer detail page, fall back to alt text, then slug from URL
-        title = detail.get("title", "")
-        if not title:
-            alt = entry.get("alt_text", "")
-            if alt and alt.lower() not in JUNK_TITLES:
-                title = alt
-        if not title and detail_url:
-            slug = detail_url.rstrip("/").split("/")[-1]
-            title = slug.replace("-", " ").title()
-        if not title:
-            continue
-        if title.lower().strip() in JUNK_TITLES:
-            continue
-
-        cover = {
-            "title": title,
-            "designer": detail.get("designer", ""),
-            "author": detail.get("author", ""),
-            "genre": detail.get("genre", "") or entry.get("genre", ""),
-            "image_url": image_url,
-            "source_url": detail_url or "",
-            "source": "I Need a Book Cover",
-        }
-        all_covers.append(cover)
 
     # Save
     with open(SEED_FILE, "w") as f:
         json.dump(all_covers, f, indent=2)
 
-    designers_found = sum(1 for c in all_covers if c.get("designer"))
+    with_designer = sum(1 for c in all_covers if c.get("designer"))
     with_detail = sum(1 for c in all_covers if c.get("source_url"))
     print(f"\n{'=' * 60}")
     print(f"  Done! Saved {len(all_covers)} covers to {SEED_FILE}")
-    print(f"  With designer data:  {designers_found}/{len(all_covers)}")
-    print(f"  With detail page:    {with_detail}/{len(all_covers)}")
+    print(f"  With designer data:  {with_designer}/{len(all_covers)}")
+    print(f"  With source URL:     {with_detail}/{len(all_covers)}")
     print(f"")
     print(f"  Next steps:")
     print(f"    git add data/covers_seed.json")
