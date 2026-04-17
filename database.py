@@ -227,6 +227,16 @@ if DATABASE_URL:
             )
             return cur.rowcount > 0
 
+    def wipe_all_data():
+        """Delete ALL swipes and ALL covers. Returns (swipes_deleted, covers_deleted)."""
+        with get_db_context() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM swipes")
+            swipes_deleted = cur.rowcount
+            cur.execute("DELETE FROM covers")
+            covers_deleted = cur.rowcount
+            return swipes_deleted, covers_deleted
+
 else:
     # SQLite fallback for local development
     import sqlite3
@@ -393,3 +403,12 @@ else:
                 (designer.strip(), cover_id)
             )
             return True
+
+    def wipe_all_data():
+        """Delete ALL swipes and ALL covers. Returns (swipes_deleted, covers_deleted)."""
+        with get_db_context() as conn:
+            sc = conn.execute("SELECT COUNT(*) FROM swipes").fetchone()[0]
+            cc = conn.execute("SELECT COUNT(*) FROM covers").fetchone()[0]
+            conn.execute("DELETE FROM swipes")
+            conn.execute("DELETE FROM covers")
+            return sc, cc

@@ -10,7 +10,7 @@ To force a full re-import, set FORCE_RESEED=true.
 """
 import os
 import json
-from database import init_db, get_cover_count
+from database import init_db, get_cover_count, wipe_all_data
 from scrapers.seed_loader import load_seed_covers, SEED_FILE
 from scrapers.openlibrary import scrape_openlibrary
 
@@ -19,6 +19,13 @@ init_db()
 print("=" * 60)
 print("  Book Cover Swiper - Loading Covers")
 print("=" * 60)
+
+# Wipe everything if requested (set WIPE_DATA=true on Render once, then remove)
+if os.environ.get("WIPE_DATA", "").lower() in ("1", "true", "yes"):
+    print("\n[!] WIPE_DATA=true — deleting ALL swipes and covers...")
+    swipes, covers = wipe_all_data()
+    print(f"    Deleted {swipes} swipes and {covers} covers.")
+    print("    Remove the WIPE_DATA env var after this deploy to avoid re-wiping.")
 
 cover_count = get_cover_count()
 print(f"\nDatabase currently has {cover_count} covers")
