@@ -315,6 +315,42 @@ nav a:hover, nav a.active {
     font-size: 0.75rem;
 }
 
+.like-card .designer-tag {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.like-card .designer-tag:hover {
+    color: var(--accent);
+}
+.like-card .edit-icon {
+    opacity: 0;
+    font-size: 0.7rem;
+    transition: opacity 0.2s;
+}
+.like-card .designer-tag:hover .edit-icon {
+    opacity: 1;
+}
+.like-card .add-designer-btn {
+    color: var(--accent);
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+.like-card .add-designer-btn:hover {
+    opacity: 1;
+}
+.like-card .source-link {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+.like-card .source-link:hover {
+    opacity: 1;
+    color: var(--accent);
+}
+
 .like-card .superlike-badge {
     display: inline-block;
     background: var(--superlike);

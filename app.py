@@ -2,7 +2,7 @@
 """Book Cover Swiper - Tinder for book cover design inspiration."""
 import json
 from flask import Flask, render_template, jsonify, request
-from database import init_db, get_unswiped_covers, record_swipe, get_liked_covers, get_analytics
+from database import init_db, get_unswiped_covers, record_swipe, get_liked_covers, get_analytics, update_cover_designer
 
 app = Flask(__name__)
 
@@ -52,6 +52,20 @@ def api_likes():
     """Get all liked covers."""
     likes = get_liked_covers()
     return jsonify(likes)
+
+
+@app.route("/api/covers/<int:cover_id>/designer", methods=["PUT"])
+def api_update_designer(cover_id):
+    """Update the designer for a cover."""
+    data = request.get_json()
+    if not data or "designer" not in data:
+        return jsonify({"error": "Missing designer"}), 400
+    designer = data["designer"].strip()
+    if not designer:
+        return jsonify({"error": "Designer cannot be empty"}), 400
+    if update_cover_designer(cover_id, designer):
+        return jsonify({"status": "ok", "designer": designer})
+    return jsonify({"error": "Cover not found"}), 404
 
 
 @app.route("/api/analytics", methods=["GET"])

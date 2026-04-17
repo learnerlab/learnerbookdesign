@@ -33,7 +33,12 @@ document.getElementById("nav-likes").classList.add("active");
                 ? '<span class="superlike-badge">SUPER LIKE</span>'
                 : '';
             const author = cover.author ? `<div class="detail">${esc(cover.author)}</div>` : '';
-            const designer = cover.designer ? `<div class="detail">Design: ${esc(cover.designer)}</div>` : '';
+            const designerText = cover.designer
+                ? `<div class="detail designer-tag" data-cover-id="${cover.id}">Design: <span class="designer-name">${esc(cover.designer)}</span> <span class="edit-icon" title="Edit designer">&#9998;</span></div>`
+                : `<div class="detail designer-tag add-designer" data-cover-id="${cover.id}"><span class="add-designer-btn">+ Add designer</span></div>`;
+            const sourceLink = cover.source_url
+                ? `<a href="${esc(cover.source_url)}" target="_blank" rel="noopener" class="detail source-link">View source &rarr;</a>`
+                : '';
             return `
                 <div class="like-card">
                     <img src="${esc(cover.image_url)}" alt="${esc(cover.title)}"
@@ -41,11 +46,32 @@ document.getElementById("nav-likes").classList.add("active");
                     <div class="info">
                         <h4>${esc(cover.title)}</h4>
                         ${author}
-                        ${designer}
+                        ${designerText}
+                        ${sourceLink}
                         ${badge}
                     </div>
                 </div>`;
         }).join("");
+
+        grid.addEventListener("click", async (e) => {
+            const tag = e.target.closest(".designer-tag");
+            if (!tag) return;
+            const coverId = tag.dataset.coverId;
+            const current = tag.querySelector(".designer-name")?.textContent || "";
+            const name = prompt("Enter designer name:", current);
+            if (name === null || !name.trim()) return;
+            try {
+                const resp = await fetch(`/api/covers/${coverId}/designer`, {
+                    method: "PUT",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({designer: name.trim()})
+                });
+                if (resp.ok) {
+                    tag.innerHTML = `Design: <span class="designer-name">${esc(name.trim())}</span> <span class="edit-icon" title="Edit designer">&#9998;</span>`;
+                    tag.classList.remove("add-designer");
+                }
+            } catch {}
+        });
     } catch {
         grid.innerHTML = '<p style="text-align:center;color:var(--text-muted)">Failed to load likes.</p>';
     }
