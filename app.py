@@ -23,6 +23,13 @@ def _set_profile_cookie(resp, user):
     return resp
 
 
+# Lightweight endpoint for uptime pings — keeps Render's free tier from
+# spinning down without touching the database.
+@app.route("/health")
+def health():
+    return "ok", 200
+
+
 # --- Pages ---
 
 @app.route("/")
