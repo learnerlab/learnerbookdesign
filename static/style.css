@@ -76,6 +76,130 @@ nav a.active {
     background: var(--accent);
 }
 
+nav .profile-chip {
+    color: var(--accent-warm);
+    border: 1px solid var(--border);
+}
+
+nav .profile-chip:hover {
+    color: var(--accent-warm);
+    background: var(--bg);
+}
+
+/* --- Profile Picker --- */
+.profiles-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+    text-align: center;
+}
+
+.profiles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.2rem;
+    margin-bottom: 2.5rem;
+}
+
+.profile-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 140px;
+    padding: 1.5rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 1px 6px var(--shadow);
+    font-family: var(--font-body);
+}
+
+.profile-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--shadow-hover);
+    border-color: var(--accent-warm);
+}
+
+.profile-initial {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg-alt);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    font-variation-settings: "opsz" 144, "SOFT" 40;
+}
+
+.profile-tile:hover .profile-initial {
+    background: var(--accent-warm);
+}
+
+.profile-name {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-count {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.new-profile {
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.new-profile input {
+    padding: 0.75rem 1.4rem;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 100px;
+    outline: none;
+    width: 240px;
+    transition: border-color 0.2s;
+}
+
+.new-profile input:focus {
+    border-color: var(--accent);
+}
+
+.new-profile-error {
+    margin-top: 1rem;
+    color: var(--dislike);
+    font-size: 0.85rem;
+    min-height: 1.2em;
+}
+
+.profiles-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: var(--font-display);
+}
+
 /* --- Swipe Area --- */
 .swipe-container {
     display: flex;

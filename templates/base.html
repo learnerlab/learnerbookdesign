@@ -14,6 +14,9 @@
         <a href="/" id="nav-swipe">Swipe</a>
         <a href="/likes" id="nav-likes">Liked</a>
         <a href="/analytics" id="nav-analytics">Analytics</a>
+        {% if user %}
+        <a href="/profiles" class="profile-chip" title="Switch profile">{{ user.name }} &#8635;</a>
+        {% endif %}
     </nav>
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}

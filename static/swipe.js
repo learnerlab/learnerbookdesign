@@ -13,6 +13,10 @@
     async function loadCovers() {
         try {
             const resp = await fetch("/api/covers?limit=30");
+            if (resp.status === 401) {
+                location.href = "/profiles";
+                return;
+            }
             const data = await resp.json();
             covers = data;
             currentIndex = 0;

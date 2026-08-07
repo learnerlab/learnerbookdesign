@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Who's Swiping? - Book Cover Swiper{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Who's <em>Swiping?</em></h1>
+    <p>Pick your profile or start a new one — everyone gets their own fresh deck of covers</p>
+</div>
+<div class="profiles-container">
+    <div class="profiles-grid" id="profiles-grid">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+    </div>
+    <form class="new-profile" id="new-profile-form">
+        <input type="text" id="new-profile-name" placeholder="Your name" maxlength="40" autocomplete="off">
+        <button type="submit" class="btn">Start Swiping</button>
+    </form>
+    <p class="new-profile-error" id="profile-error"></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function() {
+    const grid = document.getElementById("profiles-grid");
+    try {
+        const resp = await fetch("/api/profiles");
+        const profiles = await resp.json();
+
+        if (profiles.length === 0) {
+            grid.innerHTML = '<p class="profiles-empty">No profiles yet — be the first.</p>';
+            return;
+        }
+
+        grid.innerHTML = profiles.map(p => `
+            <button class="profile-tile" data-profile-id="${p.id}">
+                <span class="profile-initial">${esc(p.name.charAt(0).toUpperCase())}</span>
+                <span class="profile-name">${esc(p.name)}</span>
+                <span class="profile-count">${p.swipe_count} swipe${p.swipe_count === 1 ? '' : 's'}</span>
+            </button>
+        `).join("");
+
+        grid.addEventListener("click", async (e) => {
+            const tile = e.target.closest(".profile-tile");
+            if (!tile) return;
+            const resp = await fetch(`/api/profiles/${tile.dataset.profileId}/select`, { method: "POST" });
+            if (resp.ok) location.href = "/";
+        });
+    } catch {
+        grid.innerHTML = '<p class="profiles-empty">Failed to load profiles.</p>';
+    }
+})();
+
+document.getElementById("new-profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("new-profile-name").value.trim();
+    const errEl = document.getElementById("profile-error");
+    errEl.textContent = "";
+    if (!name) return;
+    try {
+        const resp = await fetch("/api/profiles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            location.href = "/";
+        } else {
+            errEl.textContent = data.error || "Something went wrong.";
+        }
+    } catch {
+        errEl.textContent = "Connection error — try again.";
+    }
+});
+
+function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+{% endblock %}
