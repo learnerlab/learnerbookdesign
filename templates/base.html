@@ -8,6 +8,30 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <script>
+    // Scraped image URLs mostly point at ineedabookcover.com's NitroPack CDN,
+    // whose rev-stamped URLs die when the site rebuilds its cache. The original
+    // WordPress URL is embedded in the CDN path — retry with it before giving up.
+    function coverImgError(img, mode) {
+        if (!img.dataset.retried) {
+            const m = img.src.match(/nitrocdn\.com\/.*?\/(ineedabookcover\.com\/.+)$/);
+            if (m) {
+                img.dataset.retried = "1";
+                img.src = "https://" + decodeURIComponent(m[1]);
+                return;
+            }
+        }
+        if (mode === "card") {
+            img.onerror = null;
+            img.src = "data:image/svg+xml," + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="380">' +
+                '<rect fill="#f0ece6" width="320" height="380"/>' +
+                '<text x="50%" y="50%" fill="#a0a0a0" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="16">Cover not available</text></svg>');
+        } else {
+            img.style.display = "none";
+        }
+    }
+    </script>
 </head>
 <body>
     <nav>

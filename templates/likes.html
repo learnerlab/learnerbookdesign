@@ -42,7 +42,7 @@ document.getElementById("nav-likes").classList.add("active");
             return `
                 <div class="like-card">
                     <img src="${esc(cover.image_url)}" alt="${esc(cover.title)}"
-                         onerror="this.style.display='none'">
+                         onerror="coverImgError(this)">
                     <div class="info">
                         <h4>${esc(cover.title)}</h4>
                         ${author}

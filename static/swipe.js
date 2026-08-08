@@ -79,7 +79,7 @@
             <div class="swipe-indicator like">LIKE</div>
             <div class="swipe-indicator dislike">NOPE</div>
             <img class="card-image" src="${escapeHtml(cover.image_url)}" alt="${escapeHtml(cover.title)}"
-                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22380%22><rect fill=%22%23222%22 width=%22320%22 height=%22380%22/><text x=%2250%25%22 y=%2250%25%22 fill=%22%23555%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22sans-serif%22 font-size=%2216%22>Cover not available</text></svg>'">
+                 onerror="coverImgError(this, 'card')">
             <div class="card-info">
                 <h3>${escapeHtml(cover.title)}</h3>
                 ${authorHtml}
