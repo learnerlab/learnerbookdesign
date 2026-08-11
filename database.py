@@ -105,6 +105,13 @@ if DATABASE_URL:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_covers_designer ON covers(designer)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_covers_genre ON covers(genre)")
 
+            # Supabase exposes every public-schema table through its REST API.
+            # This app only ever connects directly over Postgres (as the table
+            # owner, which bypasses RLS), so enabling RLS with no policies
+            # locks the API out entirely without affecting the app.
+            for table in ("covers", "swipes", "users"):
+                cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+
             # Migrate pre-multi-user swipes to the default profile
             cur.execute("SELECT COUNT(*) FROM swipes WHERE user_id IS NULL")
             orphans = _fetchone_val(cur)
