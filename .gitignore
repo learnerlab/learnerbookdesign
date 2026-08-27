@@ -10,3 +10,13 @@ dist/
 build/
 *.db
 .DS_Store
+
+# Learner Score (Next.js)
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+# phase-1 local response store (replaced by Postgres in phase 2)
+data/responses.local.json

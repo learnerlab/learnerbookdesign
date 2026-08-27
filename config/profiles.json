@@ -1,0 +1,29 @@
+{
+  "profiles": [
+    {
+      "key": "learner_mode",
+      "name": "Learner Mode",
+      "when": { "all_at_least": 70 }
+    },
+    {
+      "key": "believer",
+      "name": "Believer",
+      "when": { "weakest": "actions", "others_mean_minus_weakest_at_least": 15 }
+    },
+    {
+      "key": "grinder",
+      "name": "Grinder",
+      "when": { "weakest": "stress", "min_scores": { "actions": 60 } }
+    },
+    {
+      "key": "doubter",
+      "name": "Doubter",
+      "when": { "weakest": "growth" }
+    },
+    {
+      "key": "builder",
+      "name": "Builder",
+      "when": {}
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+{
+  "version": "1.0",
+  "sections": [
+    {
+      "key": "growth",
+      "name": "Growth mindset",
+      "intro": "How much do you agree with each statement?",
+      "scale": {
+        "type": "agreement",
+        "options": [
+          { "value": 1, "label": "Strongly agree" },
+          { "value": 2, "label": "Agree" },
+          { "value": 3, "label": "Mostly agree" },
+          { "value": 4, "label": "Mostly disagree" },
+          { "value": 5, "label": "Disagree" },
+          { "value": 6, "label": "Strongly disagree" }
+        ]
+      },
+      "items": [
+        {
+          "id": "g1",
+          "text": "[FILL: Dweck growth mindset item 1 from Stanford SPARQ, with \"intelligence\" replaced by \"abilities\" — see CLAUDE.md §4.2]",
+          "direction": "higher_is_better",
+          "note": "Fixed-mindset statement; more disagreement = more growth mindset."
+        },
+        {
+          "id": "g2",
+          "text": "[FILL: Dweck growth mindset item 2 from Stanford SPARQ, with \"intelligence\" replaced by \"abilities\" — see CLAUDE.md §4.2]",
+          "direction": "higher_is_better",
+          "note": "Fixed-mindset statement; more disagreement = more growth mindset."
+        },
+        {
+          "id": "g3",
+          "text": "[FILL: Dweck growth mindset item 3 from Stanford SPARQ, with \"basic intelligence\" replaced by \"basic abilities\" — see CLAUDE.md §4.2]",
+          "direction": "higher_is_better",
+          "note": "Fixed-mindset statement; more disagreement = more growth mindset."
+        }
+      ]
+    },
+    {
+      "key": "stress",
+      "name": "Stress mindset",
+      "intro": "How much do you agree with each statement about stress?",
+      "scale": {
+        "type": "agreement",
+        "options": [
+          { "value": 0, "label": "Strongly disagree" },
+          { "value": 1, "label": "Disagree" },
+          { "value": 2, "label": "Neither agree nor disagree" },
+          { "value": 3, "label": "Agree" },
+          { "value": 4, "label": "Strongly agree" }
+        ]
+      },
+      "items": [
+        {
+          "id": "s1",
+          "text": "[FILL: Stress Mindset Measure item 1, verbatim from the Stanford Mind & Body Lab document — see CLAUDE.md §4.3]",
+          "direction": "lower_is_better",
+          "note": "[FILL: confirm direction against the source — asterisked \"stress is debilitating\" items are lower_is_better; \"stress is enhancing\" items are higher_is_better.]"
+        },
+        {
+          "id": "s2",
+          "text": "[FILL: Stress Mindset Measure item 2, verbatim — see CLAUDE.md §4.3]",
+          "direction": "higher_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s3",
+          "text": "[FILL: Stress Mindset Measure item 3, verbatim — see CLAUDE.md §4.3]",
+          "direction": "lower_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s4",
+          "text": "[FILL: Stress Mindset Measure item 4, verbatim — see CLAUDE.md §4.3]",
+          "direction": "higher_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s5",
+          "text": "[FILL: Stress Mindset Measure item 5, verbatim — see CLAUDE.md §4.3]",
+          "direction": "lower_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s6",
+          "text": "[FILL: Stress Mindset Measure item 6, verbatim — see CLAUDE.md §4.3]",
+          "direction": "higher_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s7",
+          "text": "[FILL: Stress Mindset Measure item 7, verbatim — see CLAUDE.md §4.3]",
+          "direction": "lower_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        },
+        {
+          "id": "s8",
+          "text": "[FILL: Stress Mindset Measure item 8, verbatim — see CLAUDE.md §4.3]",
+          "direction": "higher_is_better",
+          "note": "[FILL: confirm direction against the source.]"
+        }
+      ]
+    },
+    {
+      "key": "actions",
+      "name": "Learner actions",
+      "intro": "Think about the last 30 days — work, sport, hobbies, parenting, anything you're trying to get better at. How often did you…",
+      "scale": {
+        "type": "frequency",
+        "options": [
+          { "value": 0, "label": "Never" },
+          { "value": 1, "label": "Almost never" },
+          { "value": 2, "label": "Sometimes" },
+          { "value": 3, "label": "Fairly often" },
+          { "value": 4, "label": "Very often" }
+        ]
+      },
+      "items": [
+        {
+          "id": "a1",
+          "text": "Choose the harder option when an easier one would have gotten the job done?",
+          "behavior": "challenge",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a2",
+          "text": "Do something you're not good at yet in front of other people?",
+          "behavior": "arena",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a3",
+          "text": "Ask someone directly for feedback on how you could improve?",
+          "behavior": "feedback",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a4",
+          "text": "Try a new way of doing something you already do well?",
+          "behavior": "experiment",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a5",
+          "text": "After something went badly, take time to figure out what you'd do differently?",
+          "behavior": "reflect",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a6",
+          "text": "Explain something you're still learning to someone else?",
+          "behavior": "teach",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a7",
+          "text": "Use a coach, course, book, or expert specifically to get better at something?",
+          "behavior": "resources",
+          "direction": "higher_is_better"
+        },
+        {
+          "id": "a8",
+          "text": "Pass on a chance to do something because you weren't sure you'd be good at it?",
+          "behavior": "avoidance",
+          "direction": "lower_is_better"
+        }
+      ]
+    }
+  ],
+  "bonus": {
+    "id": "bonus",
+    "prompt": "One more thing. Pick your bonus:",
+    "options": [
+      { "key": "easy", "label": "Three quick tips you can use today." },
+      { "key": "hard", "label": "One hard exercise most people quit." }
+    ]
+  }
+}

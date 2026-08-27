@@ -1,0 +1,7 @@
+{
+  "bands": [
+    { "key": "low", "min": 0, "max": 49, "name": "[FILL: low band name]" },
+    { "key": "mid", "min": 50, "max": 74, "name": "[FILL: mid band name]" },
+    { "key": "high", "min": 75, "max": 100, "name": "[FILL: high band name]" }
+  ]
+}
